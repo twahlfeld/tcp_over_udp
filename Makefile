@@ -9,13 +9,15 @@ CXXFLAGS = -g -Wall $(INCLUDES) -std=c++11
 LDFLAGS = -g
 LDLIBS  =
 
-executables = sender
-objects = sender.o
-
 .PHONY: default
-default: $(executables)
+default: sender receiver
+	rm -rf *~ a.out *.o *dSYM
 
-$(objects): sender.h sender.cpp
+sender: tcp.o sender.p
+
+receiver: tcp.o receiver.o
+
+tcp.o: tcp.cpp tcp.h
 
 .PHONY: clean
 clean:
