@@ -13,7 +13,7 @@ LDLIBS  =
 default: sender receiver
 	rm -rf *~ a.out *.o *dSYM
 
-sender: tcp.o sender.p
+sender: tcp.o sender.o
 
 receiver: tcp.o receiver.o
 
@@ -21,7 +21,7 @@ tcp.o: tcp.cpp tcp.h
 
 .PHONY: clean
 clean:
-	rm -f *~ a.out core $(objects) $(executables)
+	rm -f *~ a.out core *.o sender receiver
 
 .PHONY: all
 all: clean default
