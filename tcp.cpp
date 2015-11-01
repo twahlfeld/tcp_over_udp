@@ -2,9 +2,11 @@
 // Created by Theodore Ahlfeld on 10/30/15.
 //
 #include <iostream>
+#include <fcntl.h>
 #include "tcp.h"
 
 #define NOFLAG 0
+static size_t window_size;
 
 addrinfo *create_udp_addr(char *hostname, char *port)
 {
@@ -22,7 +24,9 @@ addrinfo *create_udp_addr(char *hostname, char *port)
 
 int create_udp_socket(addrinfo *addr) {
 
-    int sock = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
+    int sock = socket(addr->ai_family, (addr->ai_socktype),
+                      (addr->ai_protocol));
+    fcntl(sock, O_NONBLOCK);
     if(sock < -1) {
         die_with_err("socket() failed");
     }
@@ -36,13 +40,9 @@ void bind_udp(int sock, struct addrinfo *addr) {
 }
 
 int udp_init_listen(char *port) {
-    std::perror("BEFORE CREATE_UDP_ADDR");
     struct addrinfo *addr = create_udp_addr(nullptr, port);
-    std::perror("BEFORE CREATE_UDP_SOCKET");
     int sock = create_udp_socket(addr);
-    std::perror("BEFORE BIND_UDP");
     bind_udp(sock, addr);
-    std::perror("BEFORE FREEADDRINFO");
     freeaddrinfo(addr);
     return sock;
 }
@@ -51,13 +51,15 @@ ssize_t recv_tcp(int sock, char *buf, size_t buflen) {
     ssize_t len;
     struct sockaddr_storage src_addr;
     socklen_t src_len = sizeof(src_addr);
-    //do {
+    //Packet
+    do {
         len = recvfrom(sock, buf, buflen, NOFLAG,
                        (struct sockaddr *) &src_addr, &src_len);
+
         if (len <= 0) {
             return len;
         }
-    //} while(len);
+    } while(len);
     return len;
 }
 
