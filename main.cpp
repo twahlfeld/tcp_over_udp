@@ -1,4 +1,8 @@
-//
-// Created by Theodore Ahlfeld on 10/30/15.
-//
+#include <iostream>
 
+using namespace std;
+
+int main() {
+    cout << "Hello, World!" << endl;
+    return 0;
+}

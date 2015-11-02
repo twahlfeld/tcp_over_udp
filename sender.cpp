@@ -2,20 +2,20 @@
 // Created by Theodore Ahlfeld on 10/30/15.
 //
 #include <iostream>
-#include "packet.h"
 #include "tcp.h"
 
 #define MAXBUFF 4096
+extern size_t window_size;
 
 int main(int argc, char *argv[])
 {
-    if(argc > 7 && argc < 6) {
+    if(argc > 7 || argc < 6) {
         die_with_err("Incorrect number of arguments\n"
                      "sender <filename> <remote_IP> <remote_port> "
                      "<ack_port_num> <log_filename> <window_size(optional)>");
     }
     size_t len;
-    extern window_size = (argc == 7 ? atoi(argv[6]) : 1);
+    window_size = (size_t)(argc == 7 ? atoi(argv[6]) : 1);
     if(window_size == 0) {
         die_with_err("Invalid Window Size");
     }
@@ -28,7 +28,9 @@ int main(int argc, char *argv[])
 
     while((len = fread(buf, sizeof(char), MAXBUFF, fp)) > 0) {
         ssize_t packlen;
-        packlen = send_tcp(send_sock, buf, len, addr);
+        packlen = send_tcp(send_sock, buf, len, addr,
+                           (uint16_t)atoi(argv[4]), (uint16_t)atoi(argv[3]));
+
     }
     return 0;
 }

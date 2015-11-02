@@ -14,6 +14,7 @@ int create_udp_socket(addrinfo *addr);
 int udp_init_listen(char *port);
 ssize_t recv_tcp(int sock, char *buf, size_t buflen);
 int udp_init(char *hostname, char *port);
-ssize_t send_tcp(int sock, char *buf, size_t buflen, struct addrinfo *addr);
+ssize_t send_tcp(int sock, char *buf, size_t buflen, struct addrinfo *addr,
+                 uint16_t src_port, uint16_t dst_port);
 
 #endif
