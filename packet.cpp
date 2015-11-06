@@ -100,7 +100,7 @@ Packet::Packet(uint8_t *buf, size_t len)
     this->checksum = char_to_word(buf+16);
     this->urgent = char_to_word(buf+18);
     this->data = new uint8_t[len-HEADLEN];
-    memcpy(this->data, buf, len+HEADLEN);
+    memcpy(this->data+HEADLEN, buf+HEADLEN, len-HEADLEN);
 }
 
 Packet::~Packet()

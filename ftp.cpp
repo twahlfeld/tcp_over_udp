@@ -3,6 +3,7 @@
 //
 
 #include <iostream>
+#include <cstring>
 #include "tcp.h"
 #include "ftp.h"
 
