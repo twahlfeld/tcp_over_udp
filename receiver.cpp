@@ -15,26 +15,23 @@ int main(int argc, char *argv[])
                      "receiver <filename> <listening_port> <sender_IP> "
                      "<sender_port> <log_filename>");
     }
-    //FILE *fp = fopen(argv[1], "w");
+    FILE *fp = fopen(argv[1], "w");
     int recv_sock = udp_init_listen(argv[2]);
-    std::perror("AFTER UDP_INIT_LISTEN");
-
 
 
     char buf[MAXBUFF];
-    ssize_t len = recv_tcp(recv_sock, buf, sizeof(buf));
+    ssize_t len = recv_tcp(recv_sock, buf, sizeof(buf), nullptr);
     if(len < 0) {
         die_with_err("recvfrom() failed");
     } else if (len < 0) {
         printf("Peer close their half of the socket");
     } else {
-        printf("%s\n", buf);
+        fwrite(buf, sizeof(char), len, fp);
     }
 
+    //struct addrinfo *send_addr = create_udp_addr(argv[3], argv[4]);
+    //int send_sock = create_udp_socket(send_addr);
 
-    /*struct addrinfo *send_addr = create_udp_addr(argv[3], argv[4]);
-    int send_sock = create_udp_socket(send_addr);*/
-
-
+    fclose(fp);
     return 0;
 }
