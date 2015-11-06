@@ -3,6 +3,7 @@
 //
 
 #include <iostream>
+#include <cstdlib>
 #include <cstdint>
 #include <cstring>
 #include "packet.h"
@@ -98,8 +99,8 @@ Packet::Packet(uint8_t *buf, size_t len)
     this->recv_window = char_to_word(buf+14);
     this->checksum = char_to_word(buf+16);
     this->urgent = char_to_word(buf+18);
-    this->data = new uint8_t[len-HEADLEN];
-    memcpy(this->data+HEADLEN, buf, len);
+    this->data = new uint8_t[len];
+    memcpy(this->data, buf, len);
 }
 
 Packet::~Packet()

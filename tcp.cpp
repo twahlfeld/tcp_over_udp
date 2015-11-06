@@ -54,24 +54,49 @@ int udp_init_listen(char *port) {
     freeaddrinfo(addr);
     return sock;
 }
-bool Compare(Packet *lhs, Packet *rhs)
+
+struct PacketCompare
 {
-    return lhs->get_seq() > rhs->get_seq();
-}
+    bool operator()(Packet *lhs, Packet *rhs) const
+    {
+        return lhs->get_seq() < rhs->get_seq();
+    }
+};
 
 ssize_t recv_tcp(int sock, uint8_t *buf, size_t buflen, Results *res) {
     ssize_t len;
     struct sockaddr_storage src_addr;
     socklen_t src_len = sizeof(src_addr);
-    std::priority_queue< <Packet>, std::vector<Packet>, Compare> pq;
+    int fin = 0;
+    uint32_t expected_seq = 0;
+    std::priority_queue<Packet *, std::vector<Packet *>, PacketCompare > pq;
     do {
-        len = recvfrom(sock, buf, buflen, NOFLAG,
-                       (struct sockaddr *) &src_addr, &src_len);
-        fwrite(buf, 1, len, stdout);
-        if (len <= 0) {
-            return len;
+        uint8_t packet_data[MSS+HEADLEN];
+        len = recvfrom(sock, packet_data, MSS+HEADLEN, NOFLAG,
+                       (struct sockaddr *)&src_addr, &src_len);
+        Packet *pkt = new Packet(packet_data, (size_t)len);
+        fin = pkt->check_flags(FINFLAG);
+        for(int j =0; j < HEADLEN; j++) {
+            printf("%s%02x", j%4 ? " " : "\n", (pkt->get_data())[j]);
         }
-    } while(len);
+        printf("\n");
+        fwrite(pkt->get_data()+HEADLEN, sizeof(uint8_t), len-HEADLEN, stdout);
+        printf("\nEND\n");
+        if(expected_seq == pkt->get_seq()) {
+			memcpy(buf+pkt->get_seq(), pkt->get_data()+HEADLEN, ((size_t)len)-HEADLEN);
+            expected_seq += len-HEADLEN;
+            delete pkt;
+            while(!pq.empty()&&(pq.top())->get_seq()==expected_seq) {
+                pkt = pq.top();
+                memcpy(buf+pkt->get_seq(), pkt->get_data()+HEADLEN,
+                       ((size_t)len)-HEADLEN);
+                expected_seq += len-HEADLEN;
+                pq.pop();
+            }
+        } else {
+            pq.push(pkt);
+        }
+    } while(!pq.empty() || !fin);
     return len;
 }
 
@@ -79,11 +104,14 @@ ssize_t send_tcp(int sock, uint8_t *buf, size_t buflen, struct addrinfo *addr,
                  uint16_t src_port, uint16_t dst_port, Results *res) {
     Packet *window = new Packet[window_size];
     ssize_t size;
+    size_t total_sent = 0;
     int i, max = (int)ceil(MSS/buflen);
     for(i = 0; i < max; i++) {
         size_t len = min(buflen - (i * MSS), MSS);
+        total_sent += len;
         window[i].init(src_port, dst_port, buf + (i * MSS), len,
-                           sequence + (uint16_t) (i * MSS), NOFLAG);
+                       sequence + (uint16_t) (i * MSS),
+                       ((size_t)len == total_sent ? FINFLAG : (uint8_t)NOFLAG));
         sendto(sock, window[i].get_data(), len+HEADLEN,
                NOFLAG, addr->ai_addr, addr->ai_addrlen);
     }
