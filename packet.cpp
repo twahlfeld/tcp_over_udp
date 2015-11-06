@@ -7,18 +7,18 @@
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 
-void convert_word(char *data, int16_t x)
+void convert_word(uint8_t *data, int16_t x)
 {
-    char *c = data;
-    *c = (char)((x>>8) & 0xFF);
-    *(++c) = (char)(x & 0xFF);
+    uint8_t *c = data;
+    *c = (uint8_t)((x>>8) & 0xFF);
+    *(++c) = (uint8_t)(x & 0xFF);
 }
 
-void convert_dword(char *data, uint32_t x)
+void convert_dword(uint8_t *data, uint32_t x)
 {
     int i;
     for(i = 0; i < 4; i++) {
-        data[i] = (char)((x >> (32 + (i+1)*8)) * 0xFF);
+        data[i] = (uint8_t)((x >> (32 + (i+1)*8)) * 0xFF);
     }
 }
 
@@ -28,8 +28,8 @@ void Packet::init_header()
     convert_word(data+2, this->dst_port);
     convert_dword(data+4, this->seq_num);
     convert_dword(data+8, this->ack_num);
-    data[12] = (char)(((this->len)<<4) & 0xF0);
-    data[13] = (char)((this->flags) & 0x3F);
+    data[12] = (uint8_t)(((this->len)<<4) & 0xF0);
+    data[13] = (uint8_t)((this->flags) & 0x3F);
     convert_word(data+14, this->recv_window);
     convert_word(data+16, this->checksum);
     convert_word(data+18, this->urgent);
@@ -56,42 +56,53 @@ void Packet::set_checksum()
     }
 }
 
-uint16_t char_to_word(char *c)
+uint16_t char_to_word(uint8_t *c)
 {
     uint16_t word = uint16_t((*c)<<8);
     word = word | (uint16_t)(*(c+1));
     return word;
 }
 
-uint32_t char_to_dword(char *c)
+uint32_t char_to_dword(uint8_t *c)
 {
     uint32_t dword = char_to_word(c)<<16;
     dword = dword | (char_to_word(c+2));
     return dword;
 }
 
-Packet::Packet(uint16_t src, uint16_t dst, char *buf, size_t len,
-               uint16_t seq_num, uint8_t flags) {
+void Packet::init(uint16_t src, uint16_t dst, uint8_t *buf, size_t len,
+                  uint16_t seq_num, uint8_t flags)
+{
     this->src_port = src;
     this->dst_port = dst;
     this->seq_num = seq_num;
     this->flags = (unsigned)(flags & 0x3F);
     this->len = 0x5;
     this->urgent = 0;
-    memcpy(this->data+HEADLEN, buf, len);
+    this->data = new uint8_t[len+HEADLEN];
+    memcpy(data+HEADLEN, buf, len);
     set_checksum();
     init_header();
 }
 
-Packet::Packet(char *buf) {
+Packet::Packet(uint8_t *buf, size_t len)
+{
     this->src_port = char_to_word(buf);
     this->dst_port = char_to_word(buf+2);
     this->seq_num = char_to_dword(buf+4);
     this->ack_num = char_to_dword(buf+8);
-    this->len = (unsigned int)buf[12]>>4;
-    this->flags = (unsigned int)buf[13];
+    this->len = buf[12]>>4;
+    this->flags = buf[13];
     this->recv_window = char_to_word(buf+14);
     this->checksum = char_to_word(buf+16);
     this->urgent = char_to_word(buf+18);
-    strncpy(this->data, buf+20, MSS-HEADLEN);
+    this->data = new uint8_t[len-HEADLEN];
+    memcpy(this->data+HEADLEN, buf, len);
+}
+
+Packet::~Packet()
+{
+    if(data) {
+        delete[] data;
+    }
 }

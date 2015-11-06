@@ -13,9 +13,11 @@ LDLIBS  =
 default: sender receiver
 	rm -rf *~ a.out *.o *dSYM
 
-sender: tcp.o sender.o packet.o
+sender: tcp.o ftp.o sender.o packet.o
 
-receiver: tcp.o receiver.o packet.o
+receiver: tcp.o ftp.o receiver.o packet.o
+
+ftp.o: ftp.h ftp.cpp tcp.cpp tcp.h
 
 tcp.o: packet.o tcp.cpp tcp.h
 

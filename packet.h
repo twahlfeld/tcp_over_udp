@@ -5,8 +5,10 @@
 #ifndef TCP_PACKET_H
 #define TCP_PACKET_H
 
-#define HEADLEN 20
-const int MSS = 576;
+#include <array>
+
+const int HEADLEN = 20;
+const int MSS = 556;
 const uint8_t FINFLAG = 0x1;
 const uint8_t SYNFLAG = 0x2;
 const uint8_t ACKFLAG = 0x10;
@@ -23,20 +25,25 @@ private:
     uint16_t recv_window;
     uint16_t checksum;
     uint16_t urgent;
-    char data[MSS];
+    uint8_t *data;
 public:
     void init_header();
     void set_checksum();
+    int get_flags() { return (unsigned int)this->flags; }
+    int check_flags(unsigned int flag) { return flag&(this->flags); }
+    uint32_t get_seq() { return this->seq_num; }
+    void init(uint16_t src, uint16_t dst, uint8_t *buf, size_t len, uint16_t seq_num, uint8_t flags);
     //void send_packet(struct addrinfo *addr);
-    char *get_data() {
+    uint8_t *get_data() {
         return this->data;
     }
-    Packet(uint16_t src, uint16_t dst, char *buf, size_t len, uint16_t seq_num, uint8_t flags);
-    Packet() {
-
+    Packet(uint16_t src, uint16_t dst, uint8_t *buf, size_t len, uint16_t seq_num, uint8_t flags)
+    {
+        init(src, dst, buf, len, seq_num, flags);
     }
-    Packet(char *buf);
-
+    Packet(uint8_t *data, size_t len);
+    Packet();
+    ~Packet();
 };
 
 #endif //TCP_PACKET_H

@@ -20,7 +20,7 @@ int main(int argc, char *argv[])
 
 
     char buf[MAXBUFF];
-    ssize_t len = recv_tcp(recv_sock, buf, sizeof(buf));
+    ssize_t len = recv_tcp(recv_sock, buf, sizeof(buf), nullptr);
     if(len < 0) {
         die_with_err("recvfrom() failed");
     } else if (len < 0) {
@@ -29,8 +29,8 @@ int main(int argc, char *argv[])
         fwrite(buf, sizeof(char), len, fp);
     }
 
-    struct addrinfo *send_addr = create_udp_addr(argv[3], argv[4]);
-    int send_sock = create_udp_socket(send_addr);
+    //struct addrinfo *send_addr = create_udp_addr(argv[3], argv[4]);
+    //int send_sock = create_udp_socket(send_addr);
 
     fclose(fp);
     return 0;
