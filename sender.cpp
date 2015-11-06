@@ -2,6 +2,7 @@
 // Created by Theodore Ahlfeld on 10/30/15.
 //
 #include <iostream>
+#include <cstdlib>
 #include "ftp.h"
 #include "tcp.h"
 
@@ -10,14 +11,12 @@ extern size_t window_size;
 
 int main(int argc, char *argv[])
 {
-<<<<<<< HEAD
     if(argc != 7) {
-=======
-    if(argc > 7 || argc < 6) {
->>>>>>> 44d8298679737ac8ec198c028000db7fe5f1a6ed
+        if(argc > 7 || argc < 6) {
         die_with_err("Incorrect number of arguments\n"
                      "sender <filename> <remote_IP> <remote_port> "
                      "<ack_port_num> <log_filename> <window_size(optional)>");
+		}
     }
     uint16_t src_port, dst_port;
     unsigned long a_to_num = strtoul(argv[3], NULL, 10);

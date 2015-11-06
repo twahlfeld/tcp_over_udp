@@ -2,15 +2,13 @@
 // Created by Theodore Ahlfeld on 10/30/15.
 //
 #include <iostream>
-<<<<<<< HEAD
+#include <cstddef>
 #include <cstring>
-=======
 #include <fcntl.h>
 #include <math.h>
 #include <vector>
 #include <queue>
 #include "ftp.h"
->>>>>>> 44d8298679737ac8ec198c028000db7fe5f1a6ed
 #include "tcp.h"
 
 size_t window_size;

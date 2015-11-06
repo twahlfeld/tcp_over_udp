@@ -3,13 +3,15 @@
 //
 
 #include <iostream>
+#include <cstdint>
+#include <cstring>
 #include "packet.h"
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 
-void convert_word(uint8_t *data, int16_t x)
+void convert_word(void *data, int16_t x)
 {
-    uint8_t *c = data;
+    uint8_t *c = (uint8_t *)data;
     *c = (uint8_t)((x>>8) & 0xFF);
     *(++c) = (uint8_t)(x & 0xFF);
 }
