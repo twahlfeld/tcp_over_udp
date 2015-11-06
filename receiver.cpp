@@ -19,7 +19,7 @@ int main(int argc, char *argv[])
     int recv_sock = udp_init_listen(argv[2]);
 
 
-    char buf[MAXBUFF];
+    uint8_t buf[MAXBUFF];
     ssize_t len = recv_tcp(recv_sock, buf, sizeof(buf), nullptr);
     if(len < 0) {
         die_with_err("recvfrom() failed");

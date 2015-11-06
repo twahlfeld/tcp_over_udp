@@ -29,11 +29,10 @@ private:
 public:
     void init_header();
     void set_checksum();
-    int get_flags() { return (unsigned int)this->flags; }
+    int get_flags() { return this->flags; }
     int check_flags(unsigned int flag) { return flag&(this->flags); }
-    uint32_t get_seq() { return this->seq_num; }
+    const uint32_t get_seq() { return this->seq_num; }
     void init(uint16_t src, uint16_t dst, uint8_t *buf, size_t len, uint16_t seq_num, uint8_t flags);
-    //void send_packet(struct addrinfo *addr);
     uint8_t *get_data() {
         return this->data;
     }
@@ -42,7 +41,9 @@ public:
         init(src, dst, buf, len, seq_num, flags);
     }
     Packet(uint8_t *data, size_t len);
-    Packet();
+    Packet() {
+        ;
+    }
     ~Packet();
 };
 

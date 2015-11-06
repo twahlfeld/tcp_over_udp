@@ -2,6 +2,7 @@
 // Created by Theodore Ahlfeld on 10/30/15.
 //
 #include <iostream>
+#include <cstdlib>
 #include "ftp.h"
 #include "tcp.h"
 

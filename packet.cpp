@@ -3,6 +3,9 @@
 //
 
 #include <iostream>
+#include <cstdlib>
+#include <cstdint>
+#include <cstring>
 #include "packet.h"
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
@@ -97,7 +100,7 @@ Packet::Packet(uint8_t *buf, size_t len)
     this->checksum = char_to_word(buf+16);
     this->urgent = char_to_word(buf+18);
     this->data = new uint8_t[len-HEADLEN];
-    memcpy(this->data+HEADLEN, buf, len);
+    memcpy(this->data, buf, len+HEADLEN);
 }
 
 Packet::~Packet()
