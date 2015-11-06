@@ -2,6 +2,7 @@
 // Created by Theodore Ahlfeld on 10/30/15.
 //
 #include <iostream>
+#include <cstring>
 #include "tcp.h"
 
 #define NOFLAG 0

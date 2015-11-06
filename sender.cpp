@@ -6,7 +6,7 @@
 
 int main(int argc, char *argv[])
 {
-    if(argc != 6) {
+    if(argc != 7) {
         die_with_err("Incorrect number of arguments\n"
                      "sender <filename> <remote_IP> <remote_port> "
                      "<ack_port_num> <log_filename> <window_size>");
