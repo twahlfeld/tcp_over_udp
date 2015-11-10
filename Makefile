@@ -1,5 +1,5 @@
-CC  = clang++
-CXX = clang++
+CC  = g++
+CXX = g++
 
 INCLUDES =
 

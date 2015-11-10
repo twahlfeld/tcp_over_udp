@@ -15,8 +15,9 @@ typedef struct Results {
     uint32_t seg_retrans;
 } Results;
 
-Results sendfile(FILE *fp, int sock, uint16_t src_port,
-                 uint16_t  dst_port, struct addrinfo *addr);
-Results recvfile(FILE *fp, int sock, uint16_t src_port, uint16_t dst_port);
+Results sendfile(FILE *fp, int sock, uint16_t src_port, uint16_t dst_port,
+                 struct addrinfo *addr, int tcpsock);
+Results recvfile(FILE *fp, int recvsock, int tcpsock, char *src,
+                 char *dst, FILE *log);
 
 #endif //TCP_OVER_UDP_FTP_H

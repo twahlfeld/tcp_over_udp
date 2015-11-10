@@ -5,8 +5,6 @@
 #ifndef TCP_PACKET_H
 #define TCP_PACKET_H
 
-#include <array>
-
 const int HEADLEN = 20;
 const int MSS = 556;
 const uint8_t FINFLAG = 0x1;
@@ -28,22 +26,30 @@ private:
     uint8_t *data;
 public:
     void init_header();
-    void set_checksum();
-    int get_flags() { return this->flags; }
+    uint16_t calc_checksum(size_t len);
+    bool check_checksum(size_t len);
+    int get_flags() { return (this->flags&0x3F); }
     int check_flags(unsigned int flag) { return flag&(this->flags); }
     const uint32_t get_seq() { return this->seq_num; }
-    void init(uint16_t src, uint16_t dst, uint8_t *buf, size_t len, uint16_t seq_num, uint8_t flags);
+    const uint32_t get_ack() { return this->ack_num; }
+    const uint16_t get_srcport() { return this->src_port; }
+    const uint16_t get_dstport() { return this->dst_port; }
+    void init(uint16_t src, uint16_t dst, uint8_t *buf, size_t len,
+              uint32_t seq_num, uint32_t ack_num, uint8_t flags);
     uint8_t *get_data() {
         return this->data;
     }
-    Packet(uint16_t src, uint16_t dst, uint8_t *buf, size_t len, uint16_t seq_num, uint8_t flags)
+    Packet(uint16_t src, uint16_t dst, uint8_t *buf, size_t len,
+           uint32_t seq_num, uint8_t flags)
     {
-        init(src, dst, buf, len, seq_num, flags);
+        this->init(src, dst, buf, len, seq_num, 0, flags);
     }
     Packet(uint8_t *data, size_t len);
-    Packet() {
-        ;
+    Packet(uint16_t src, uint16_t dst, uint32_t ack, uint8_t flags)
+    {
+        this->init(src, dst, nullptr, 0, 0, ack, flags);
     }
+    Packet();
     ~Packet();
 };
 
