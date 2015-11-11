@@ -11,19 +11,6 @@
 #include "tcp.h"
 #include "receiver.h"
 
-#define MAXBUFF 4096
-
-char *locport_to_str(const char *loc, char *port)
-{
-
-    char *locport = (char *)malloc(sizeof(char)*
-                                    (strlen(loc)+strlen(port)+2));
-    strcpy(locport, loc);
-    strcat(locport, ":");
-    strcat(locport, port);
-    return locport;
-}
-
 int create_tcpsock(char *host, char *port)
 {
     struct sockaddr_in serv_addr;
@@ -43,7 +30,7 @@ int create_tcpsock(char *host, char *port)
     serv_addr.sin_port        = htons(atoi(port));
     int res;
     while((res = connect(sock, (struct sockaddr*)&serv_addr,
-                         sizeof(serv_addr))) < 0 && errno == ECONNREFUSED);
+                         sizeof(serv_addr))) < 0);
     fcntl(sock, F_SETFL, O_NONBLOCK);
     setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enabled, sizeof(int));
     setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &enabled, sizeof(int));
@@ -71,16 +58,15 @@ int main(int argc, char *argv[])
     }
     int recv_sock = udp_init_listen(argv[2]);
     int send_sock = create_tcpsock(argv[3], argv[4]);
-    char *dst = locport_to_str("127.0.0.1", argv[2]);
-    char *src = locport_to_str(argv[3], argv[4]);
 
-    recvfile(fp, recv_sock, send_sock, src, dst, log);
-    perror("PERROR:");
+    if(recvfile(fp, recv_sock, send_sock, log)) {
+        printf("Delivery was unsuccessful\n");
+    } else {
+        printf("Delivery completed successfully\n");
+    }
     fclose(fp);
     fclose(log);
     close(recv_sock);
     close(send_sock);
-    free(src);
-    free(dst);
     return 0;
 }

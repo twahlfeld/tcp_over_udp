@@ -28,23 +28,14 @@ void convert_dword(uint8_t *data, uint32_t x)
 void Packet::init_header()
 {
     convert_word(data, this->src_port);
-    //printf("src:%d\n", src_port);
     convert_word(data+2, this->dst_port);
-    //printf("dst:%d\n", dst_port);
     convert_dword(data+4, this->seq_num);
-    //printf("seq:%d\n", seq_num);
     convert_dword(data+8, this->ack_num);
-    //printf("ack:%d\n", ack_num);
     data[12] = (uint8_t)(((this->len)<<4) & 0xF0);
-    //printf("len:%d\n", len);
     data[13] = (uint8_t)((this->flags) & 0x3F);
-    //printf("flg:%d\n", flags);
     convert_word(data+14, this->recv_window);
-    //printf("win:%d\n", recv_window);
     convert_word(data+16, 0);;
-    //printf("chk:%d\n", 0);
     convert_word(data+18, this->urgent);;
-    //printf("urgent:%d\n\n", urgent);
 }
 
 uint16_t Packet::calc_checksum(size_t len)
@@ -110,23 +101,14 @@ Packet::Packet(uint8_t *buf, size_t len)
     this->data = new uint8_t[len]();
     memcpy(this->data, buf, len);
     this->checksum = char_to_word(buf+16);
-    //printf("chk:%d\n", checksum);
     this->src_port = char_to_word(buf);
-    //printf("src:%d\n", src_port);
     this->dst_port = char_to_word(buf+2);
-    //printf("dst:%d\n", dst_port);
     this->seq_num = char_to_dword(buf+4);
-    //printf("seq:%d\n", seq_num);
     this->ack_num = char_to_dword(buf+8);
-    //printf("ack:%d\n", ack_num);
     this->len = buf[12]>>4;
-    //printf("len:%d\n", this->len);
     this->flags = buf[13];
-    //printf("flg:%d\n", flags);
     this->recv_window = char_to_word(buf+14);
-    //printf("win:%d\n", recv_window);
     this->urgent = char_to_word(buf+18);
-    //printf("urg:%d\n\n", urgent);
 }
 
 Packet::Packet()

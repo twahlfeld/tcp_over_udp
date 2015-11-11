@@ -6,10 +6,10 @@
 #include <cstring>
 #include <unistd.h>
 #include <sys/fcntl.h>
+#include <inttypes.h>
 #include "ftp.h"
 #include "tcp.h"
 
-extern size_t window_size;
 
 struct sockaddr_in init_socket_addr(const unsigned long addr,
                                     const uint16_t port)
@@ -33,7 +33,7 @@ int create_tcp_listener(char *port)
     }
     setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enabled, sizeof(int));
     setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &enabled, sizeof(int));
-    fcntl(sock, F_SETFL, O_NONBLOCK);
+    //fcntl(sock, F_SETFL, O_NONBLOCK);
     if (bind(sock, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
         die_with_err("bind() failed");
     }
@@ -52,6 +52,7 @@ int main(int argc, char *argv[])
                      "<ack_port_num> <log_filename> <window_size(optional)>");
 		}
     }
+    size_t window_size;
     uint16_t src_port, dst_port;
     unsigned long a_to_num = strtoul(argv[3], NULL, 10);
     if(a_to_num > 0xFFFF || a_to_num == 0) {
@@ -63,6 +64,7 @@ int main(int argc, char *argv[])
         die_with_err("Invalid ACK Port Number");
     }
     src_port = (uint16_t)a_to_num;
+    FILE *log = (strcmp("stdout", argv[5]) ? fopen(argv[5], "w") : stdout);
     window_size = (size_t)(argc == 7 ? atoi(argv[6]) : 1);
     if(window_size == 0) {
         die_with_err("Invalid Window Size");
@@ -72,10 +74,18 @@ int main(int argc, char *argv[])
     int send_sock = create_udp_socket(addr);
     int recv_sock = create_tcp_listener(argv[4]);
 
-    Results res = sendfile(fp, send_sock, dst_port, src_port, addr, recv_sock);
+    Results res = sendfile(fp, send_sock, dst_port, src_port, addr, recv_sock, window_size, log);
+    if(res.status == 0) {
+        printf("Delivery Completed successfuly\n");
+        printf("Total bytes send = %" PRIu64 "\n", res.bytes);
+        printf("Segments send = %u\n", res.segments);
+        printf("Segments retransmitted = %u\n", res.seg_retrans);
+    } else {
+        printf("Delivery was unsuccessful\n");
+    }
+    freeaddrinfo(addr);
     fclose(fp);
     close(recv_sock);
     close(send_sock);
-    printf("btyes:%llu\n", res.bytes);
     return 0;
 }

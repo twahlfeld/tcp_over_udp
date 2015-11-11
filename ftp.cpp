@@ -9,13 +9,11 @@
 #include "tcp.h"
 #include "ftp.h"
 
-extern size_t window_size;
 
 Results sendfile(FILE *fp, int sock, uint16_t src_port, uint16_t dst_port,
-                 struct addrinfo *addr, int tcpsock)
+                 struct addrinfo *addr, int tcpsock,
+                 size_t window_size, FILE *log)
 {
-
-    //printf("sock:%d=>Blocking:%d\n", sock, (fcntl(sock, F_GETFL) & O_NONBLOCK)!=0);
     Results res;
     memset(&res, 0, sizeof(Results));
     size_t len;
@@ -31,28 +29,26 @@ Results sendfile(FILE *fp, int sock, uint16_t src_port, uint16_t dst_port,
     }
     fcntl(acksock, F_SETFL, O_NONBLOCK);
 
-    printf("acksock:%d=>Blocking:%d\n", acksock, (fcntl(acksock, F_GETFL) & O_NONBLOCK)!=0);
     while((len = fread(buf, sizeof(char), MSS*window_size, fp)) > 0) {
-        send_tcp(sock, buf, len, addr, src_port, dst_port, &res, acksock);
+        send_tcp(sock, buf, len, addr, src_port, dst_port, &res, acksock, window_size, log);
+    }
+    if(errno == 0 || errno == EAGAIN || errno == EWOULDBLOCK) {
+        res.status = 0;
+    } else {
+        res.status = 1;
     }
     close(acksock);
     delete[] buf;
     return res;
 }
 
-Results recvfile(FILE *fp, int recvsock, int tcpsock, char *src, char *dst, FILE *log)
+int recvfile(FILE *fp, int recvsock, int tcpsock, FILE *log)
 {
-    Results res;
-    memset(&res, 0, sizeof(Results));
-    size_t len;
-    ssize_t recv_len;
     uint8_t *buf = new uint8_t[MSS*10]();
-    while((recv_len = recv_tcp(recvsock, tcpsock, buf, MSS * 10, &res, src, dst, log)) > 0) {
-        perror("PERROR recv_tcp");
-        printf("recv_len=%ld\n", recv_len);
-        len = fwrite(buf, sizeof(uint8_t), (size_t)recv_len, fp);
-        res.bytes += len;
-    }
+    while(recv_tcp(recvsock, tcpsock, fp, log) > 0);
     delete[] buf;
-    return res;
+    if(errno == EAGAIN || errno == EWOULDBLOCK) {
+        return 0;
+    }
+    return 1;
 }
