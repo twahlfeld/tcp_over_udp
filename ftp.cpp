@@ -30,7 +30,8 @@ Results sendfile(FILE *fp, int sock, uint16_t src_port, uint16_t dst_port,
     fcntl(acksock, F_SETFL, O_NONBLOCK);
 
     while((len = fread(buf, sizeof(char), MSS*window_size, fp)) > 0) {
-        send_tcp(sock, buf, len, addr, src_port, dst_port, &res, acksock, window_size, log);
+        send_tcp(sock, buf, len, addr, src_port, dst_port, &res, acksock,
+                 window_size, log);
     }
     if(errno == 0 || errno == EAGAIN || errno == EWOULDBLOCK) {
         res.status = 0;

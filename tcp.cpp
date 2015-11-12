@@ -18,14 +18,16 @@ static uint32_t sequence;
 static int finflag;
 static timeval SRTT;
 
+/* Basic Typeless Macros */
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define ABS(a)    ((a) >= 0  ? (a) : -1*(a))
 
+/* Protocols */
 bool check_timeout(struct timeval *time);
-
 ssize_t sendack(const int sock, const uint16_t src,
                 const uint16_t dst, const uint32_t ack);
 
+/* Creates a UDP Addr */
 addrinfo *create_udp_addr(char *hostname, char *port) {
     struct addrinfo hints;
     memset(&hints, 0, sizeof(hints));
@@ -69,8 +71,15 @@ struct PacketCompare {
     }
 };
 
-
+/*
+ * Receives TCP data until socket breaks or File is completely received
+ * int recvsock -> The listening UDP socket
+ * int tcpsock  -> The TCP ACK port
+ * FILE *fout   -> The file to write data too
+ * FILE *log    -> The log file to write received packet data
+ */
 size_t recv_tcp(int recvsock, int tcpsock, FILE *fout, FILE *log) {
+    /* No more data to read */
     if (finflag) {
         finflag = 0;
         return 0;
@@ -80,9 +89,11 @@ size_t recv_tcp(int recvsock, int tcpsock, FILE *fout, FILE *log) {
     uint16_t src, dst;
     struct sockaddr_storage src_addr;
     socklen_t src_len = sizeof(src_addr);
+    /* Packet and ACK bookkeeping */
     uint32_t expected_seq = 0;
     uint32_t totalsent = 0;
     uint32_t lastpkt_len = 0;
+    /* Packet Priority Queue for packet buffering */
     std::priority_queue<Packet *, std::vector<Packet *>, PacketCompare> pq;
     do {
         if (finflag && pq.empty()) {
@@ -104,10 +115,15 @@ size_t recv_tcp(int recvsock, int tcpsock, FILE *fout, FILE *log) {
         gettimeofday(&tv, NULL);
         char *logtime = ctime(&(tv.tv_sec));
         logtime[strlen(logtime) - 1] = '\0';
+        /* Checksum doesn't match */
         if (!(pkt->check_checksum((size_t) len))) {
-            fprintf(log, "FAILURE %s %u %u %u %u %d\n", logtime, src, dst,
-                    pkt->get_seq(), pkt->get_ack(), pkt->get_flags());
+            if(log != nullptr) {
+                fprintf(log, "FAILURE %s %u %u %u %u %d\n", logtime, src, dst,
+                        pkt->get_seq(), pkt->get_ack(), pkt->get_flags());
+            }
+            /* Update Timeout */
             check_timeout(&tv);
+            /* Send old ack for fast retransmit */
             if (sendack(tcpsock, dst, src, expected_seq) != HEADLEN) {
                 if (!finflag) {
                     die_with_err("send failed");
@@ -116,18 +132,23 @@ size_t recv_tcp(int recvsock, int tcpsock, FILE *fout, FILE *log) {
             delete pkt;
             continue;
         }
-        fprintf(log, "SUCCESS %s %u %u %u %u %d\n", logtime, src, dst,
-                pkt->get_seq(), pkt->get_ack(), pkt->get_flags());
+        if(log != nullptr) {
+            fprintf(log, "SUCCESS %s %u %u %u %u %d\n", logtime, src, dst,
+                    pkt->get_seq(), pkt->get_ack(), pkt->get_flags());
+        }
         if (!finflag) {
             finflag = (pkt->get_flags() & FINFLAG);
+            /* Sets the length of the last packet for final packet handeling */
             lastpkt_len = (uint32_t)len-HEADLEN;
         }
         if (expected_seq == pkt->get_seq()) {
+            /* Writes data to file output skipping the header */
             fwrite(pkt->get_data()+HEADLEN, sizeof(uint8_t),
                    (size_t)len - HEADLEN, fout);
             expected_seq += len - HEADLEN;
             totalsent += len - HEADLEN;
             delete pkt;
+            /* Writes buffered data to file if the sequence number matches */
             while (!pq.empty() && (pq.top())->get_seq() == expected_seq) {
                 pkt = pq.top();
                 size_t size = (size_t)((pkt->get_flags() & FINFLAG)
@@ -138,9 +159,9 @@ size_t recv_tcp(int recvsock, int tcpsock, FILE *fout, FILE *log) {
                 delete pkt;
                 pq.pop();
             }
-        } else if(expected_seq < pkt->get_seq()) {
+        } else if(expected_seq < pkt->get_seq()) { // Out of order packet
             pq.push(pkt);
-        } else {
+        } else { // Already written, delete
             delete pkt;
         }
         if (sendack(tcpsock, dst, src, expected_seq) != HEADLEN) {
@@ -168,9 +189,26 @@ uint32_t recvack(const int sock) {
     return 0;
 }
 
-ssize_t send_tcp(int sock, uint8_t *buf, size_t buflen, struct addrinfo *addr,
+/*
+ * Sends data to the designated UDP socket
+ * int sock             -> The UDP socket to send data over
+ * void *buf            -> Data to send
+ * size_t buflen        -> Size of data to send
+ * struct addrinfo *addr-> The addrinfor for the listening UDP addr
+ * uint16_t src_port    -> The port that data is sent from
+ * uint16_t dst_port    -> The port to send data to
+ * Results *res         -> The result structure to record data to.
+ * int tcpsock          -> The tcp ack to send data to
+ * size_t window_size   -> The desired window size, must be larger than 0
+ * FILE *log            -> The log file to write sending data to
+ */
+ssize_t send_tcp(int sock, void *buf, size_t buflen, struct addrinfo *addr,
                  uint16_t src_port, uint16_t dst_port, Results *res,
                  int tcpsock, size_t window_size, FILE *log) {
+    if(window_size==0) {
+        errno = EINVAL;
+        return -1;
+    }
     struct timeval tv;
     ssize_t ack = 0;
     static ssize_t baseack;
@@ -188,54 +226,74 @@ ssize_t send_tcp(int sock, uint8_t *buf, size_t buflen, struct addrinfo *addr,
         if (gettimeofday(&tv, NULL) < 0) {
             die_with_err("gettimeofday() failed");
         }
-        while (pkt_que.size() < window_size && i * MSS < buflen) {
-            len = min(buflen - (i * MSS), MSS);
+        /* Send all packets that can fit in the window */
+        for(;pkt_que.size() < window_size && i * MSS < buflen; i++) {
+            len = min(buflen - (i * MSS), MSS); //MSS or size of remaining data
             Packet *pkt = new
-                    Packet(src_port, dst_port, buf + (i * MSS), len,
-                           sequence,
-                           ((i+1) * MSS>buflen ? FINFLAG : (uint8_t) NOFLAG) |
+                    Packet(src_port, dst_port, (uint8_t *)buf + (i * MSS), len,
+                           sequence, ((i+1) * MSS>buflen ? FINFLAG
+                                                         : (uint8_t) NOFLAG) |
                            (i == 0 ? SYNFLAG : (uint8_t) NOFLAG));
-            res->bytes = sequence += len;
-            sendto(sock, pkt->get_data(), len + HEADLEN,
-                   NOFLAG, addr->ai_addr, addr->ai_addrlen);
+
+            if(res != nullptr) {
+                res->bytes = sequence += len;
+            }
+            sendto(sock, pkt->get_data(), len + HEADLEN, NOFLAG, addr->ai_addr,
+                   addr->ai_addrlen);
+
             gettimeofday(&tv, NULL);
             char *logtime = ctime(&(tv.tv_sec));
             logtime[strlen(logtime) - 1] = '\0';
-            fprintf(log, "Sending  %s %u %u %u %u %d %u\n", logtime, src_port,
-                    dst_port, pkt->get_seq(), pkt->get_ack(), pkt->get_flags(),
-                    (uint32_t)(SRTT.tv_sec*1000000+SRTT.tv_usec)/1000);
-            res->segments++;
+            if(log != nullptr) {
+                fprintf(log, "Sending  %s %u %u %u %u %d %u\n", logtime,
+                        src_port, dst_port, pkt->get_seq(), pkt->get_ack(),
+                        pkt->get_flags(), (uint32_t)
+                        (SRTT.tv_sec * 1000000 + SRTT.tv_usec) / 1000);
+            }
+            if(res != nullptr) {
+                res->segments++;
+            }
             pkt_que.push(pkt);
-            i++;
         }
+        /* Recv Acks til 0 or ACK that has already be processed */
         while ((ack = recvack(tcpsock)) > 0) {
             if(ack > baseack) {
-                check_timeout(&tv);
+                check_timeout(&tv); // Update RTO, SRTT, and RTTVAR
                 total_sent += ack - baseack;
                 baseack = ack;
                 counter = 0;
+                /* Remove windowed information if ACK is greater than seq_num*/
                 while (!pkt_que.empty() && pkt_que.top()->get_seq() < ack) {
                     delete pkt_que.top();
                     pkt_que.pop();
                 }
-            } else {
+            } else { // Old ACK received
                 counter++;
+                break;
             }
         }
+        /* Unexpected Errors */
         if (errno != EAGAIN && errno != EWOULDBLOCK && errno != 0) {
             die_with_err("recv() failed");
         }
-        if ((check_timeout(NULL) || ack <= baseack) && !pkt_que.empty()) {
+        /* Resending logic */
+        if ((check_timeout(NULL) || (ack <= baseack && ack > 0 && counter > 3))
+                                 && !pkt_que.empty()) {
             Packet *p = pkt_que.top();
             char *logtime = ctime(&(tv.tv_sec));
             logtime[strlen(logtime) - 1] = '\0';
-            fprintf(log, "Resending  %s %u %u %u %u %d %u\n", logtime, src_port,
-                    dst_port, p->get_seq(), p->get_ack(), p->get_flags(),
-                    (uint32_t)(SRTT.tv_sec*1000000+SRTT.tv_usec)/1000);
+            if(log != nullptr) {
+                fprintf(log, "Resending  %s %u %u %u %u %d %u\n", logtime,
+                        src_port, dst_port, p->get_seq(), p->get_ack(),
+                        p->get_flags(), (uint32_t)
+                        (SRTT.tv_sec * 1000000 + SRTT.tv_usec) / 1000);
+            }
             sendto(sock, p->get_data(),
                    (p->get_flags() & FINFLAG ? len : MSS) + HEADLEN,
                    NOFLAG, addr->ai_addr, addr->ai_addrlen);
-            res->seg_retrans++;
+            if(res != nullptr) {
+                res->seg_retrans++;
+            }
         }
     }
     return total_sent;
@@ -243,30 +301,36 @@ ssize_t send_tcp(int sock, uint8_t *buf, size_t buflen, struct addrinfo *addr,
 
 void retrans_timer(timeval *RTO, timeval *RTTVAR, timeval *R) {
     static uint32_t counter;
-    const float BETA = (1 / 4), ALPHA = (1 / 8);
+    const double BETA = (1.0 / 4.0), ALPHA = (1.0 / 8.0);
     if (counter == 0) {
         RTO->tv_sec = 1;
         RTO->tv_usec = 0;
-    }
-    if (counter == 1) {
+        SRTT.tv_sec = 1;
+    } else if (counter == 1) {
         SRTT.tv_sec = R->tv_sec;
         SRTT.tv_usec = R->tv_usec;
         RTTVAR->tv_sec = R->tv_sec / 2;
         RTTVAR->tv_usec = R->tv_usec / 2;
         RTO->tv_sec = SRTT.tv_sec + 4 * RTTVAR->tv_sec;
         RTO->tv_usec = SRTT.tv_usec + 4 * RTTVAR->tv_usec;
+        RTO->tv_sec -= RTTVAR->tv_usec / 1000000;
+        RTO->tv_usec %= 1000000;
     } else {
-        RTTVAR->tv_sec = (time_t)(((1.0 - BETA) * (float)RTTVAR->tv_sec) +
-                                  (BETA * (float)ABS(SRTT.tv_sec-R->tv_sec)));
-        RTTVAR->tv_usec =(suseconds_t)(((1.0 - BETA) * (float)RTTVAR->tv_usec)+
-                                       BETA * (float)
+        SRTT.tv_sec = (time_t) ((1.0 - ALPHA) * (double)SRTT.tv_sec +
+                                ALPHA * (double)R->tv_sec);
+        SRTT.tv_usec = (suseconds_t)((1.0-ALPHA) * (double)SRTT.tv_usec +
+                                      ALPHA * (double)R->tv_usec);
+        RTTVAR->tv_sec = (time_t)(((1.0 - BETA) * (double)RTTVAR->tv_sec) +
+                                  (BETA * (double)ABS(SRTT.tv_sec-R->tv_sec)));
+        RTTVAR->tv_usec=(suseconds_t)(((1.0 - BETA) * (double)RTTVAR->tv_usec)+
+                                       BETA * (double)
                                        ABS(SRTT.tv_usec - R->tv_usec));
-        SRTT.tv_sec = (time_t) ((1.0 - ALPHA) * (float)SRTT.tv_sec +
-                                ALPHA * (float)R->tv_sec);
-        SRTT.tv_usec = (suseconds_t) ((1.0 - ALPHA) * (float)SRTT.tv_usec +
-                                      ALPHA * (float)R->tv_usec);
+        RTTVAR->tv_sec -= RTTVAR->tv_usec/1000000;
+        RTTVAR->tv_usec %= 1000000;
         RTO->tv_sec = SRTT.tv_sec + 4 * RTTVAR->tv_sec;
         RTO->tv_usec = SRTT.tv_usec + 4 * RTTVAR->tv_usec;
+        RTO->tv_sec -= RTTVAR->tv_usec / 1000000;
+        RTO->tv_usec %= 1000000;
     }
     counter++;
 }
@@ -284,7 +348,7 @@ bool check_timeout(struct timeval *time) {
         RTO.tv_sec = 60;
     }
     if (time == nullptr) {
-        if (now.tv_sec >= tv.tv_sec + RTO.tv_sec && now.tv_usec >= tv.tv_usec + RTO.tv_usec) {
+        if (now.tv_sec >= tv.tv_sec + RTO.tv_sec) {
             RTO.tv_sec = 2 * RTO.tv_sec;
             RTO.tv_usec = 2 * RTO.tv_usec;
             return true;
@@ -293,6 +357,10 @@ bool check_timeout(struct timeval *time) {
     if (time) {
         R.tv_usec = now.tv_usec - tv.tv_usec;
         R.tv_sec = now.tv_sec - tv.tv_sec;
+        if(R.tv_usec < 0 && R.tv_sec > 0) {
+            R.tv_sec--;
+            R.tv_usec *= -1;
+        }
         retrans_timer(&RTO, &RTTVAR, &R);
         tv.tv_sec = time->tv_sec;
         tv.tv_usec = time->tv_usec;

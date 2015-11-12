@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
         printf("Delivery completed successfully\n");
     }
     fclose(fp);
-    fclose(log);
+    if(log != stdout) fclose(log);
     close(recv_sock);
     close(send_sock);
     return 0;

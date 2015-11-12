@@ -33,7 +33,6 @@ int create_tcp_listener(char *port)
     }
     setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enabled, sizeof(int));
     setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &enabled, sizeof(int));
-    //fcntl(sock, F_SETFL, O_NONBLOCK);
     if (bind(sock, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
         die_with_err("bind() failed");
     }
@@ -54,6 +53,7 @@ int main(int argc, char *argv[])
     }
     size_t window_size;
     uint16_t src_port, dst_port;
+    /* Error Checking and data setup */
     unsigned long a_to_num = strtoul(argv[3], NULL, 10);
     if(a_to_num > 0xFFFF || a_to_num == 0) {
         die_with_err("Invalid Destination Port Number");
@@ -70,14 +70,17 @@ int main(int argc, char *argv[])
         die_with_err("Invalid Window Size");
     }
     FILE *fp = fopen(argv[1], "rb");
+    /* Setting up sockets */
     struct addrinfo *addr = create_udp_addr(argv[2], argv[3]);
     int send_sock = create_udp_socket(addr);
     int recv_sock = create_tcp_listener(argv[4]);
 
-    Results res = sendfile(fp, send_sock, dst_port, src_port, addr, recv_sock, window_size, log);
+
+    Results res = sendfile(fp, send_sock, dst_port, src_port, addr, recv_sock,
+                           window_size, log);
     if(res.status == 0) {
         printf("Delivery Completed successfuly\n");
-        printf("Total bytes send = %" PRIu64 "\n", res.bytes);
+        printf("Total bytes send = %llu\n", res.bytes);
         printf("Segments send = %u\n", res.segments);
         printf("Segments retransmitted = %u\n", res.seg_retrans);
     } else {
@@ -85,6 +88,7 @@ int main(int argc, char *argv[])
     }
     freeaddrinfo(addr);
     fclose(fp);
+    if(log != stdout) fclose(log);
     close(recv_sock);
     close(send_sock);
     return 0;
