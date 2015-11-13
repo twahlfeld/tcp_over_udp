@@ -95,7 +95,7 @@ size_t recv_tcp(int recvsock, int tcpsock, FILE *fout, FILE *log) {
     uint32_t lastpkt_len = 0;
     /* Packet Priority Queue for packet buffering */
     std::priority_queue<Packet *, std::vector<Packet *>, PacketCompare> pq;
-    do {
+    for(;;) {
         if (finflag && pq.empty()) {
             return totalsent;
         }
@@ -169,7 +169,7 @@ size_t recv_tcp(int recvsock, int tcpsock, FILE *fout, FILE *log) {
                 die_with_err("send failed");
             }
         }
-    } while (!pq.empty() || !finflag);
+    }
     return totalsent;
 }
 
@@ -277,7 +277,7 @@ ssize_t send_tcp(int sock, void *buf, size_t buflen, struct addrinfo *addr,
             die_with_err("recv() failed");
         }
         /* Resending logic */
-        if ((check_timeout(NULL) || (ack <= baseack && ack > 0 && counter > 3))
+        if ((check_timeout(NULL) || (ack <= baseack && ack > 0 && counter >= 2))
                                  && !pkt_que.empty()) {
             Packet *p = pkt_que.top();
             char *logtime = ctime(&(tv.tv_sec));
